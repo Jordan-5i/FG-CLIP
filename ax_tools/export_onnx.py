@@ -30,6 +30,7 @@ def new_resize_positional_embeddings(self, positional_embeddings: torch.Tensor,
         Returns:
             `torch.Tensor`: Embeddings of shape (batch_size, max_length, embed_dim)
         """
+        spatial_shapes = torch.tensor([[30, 34]])
         batch_size = spatial_shapes.shape[0]
         embed_dim = positional_embeddings.shape[-1]
         source_dtype = positional_embeddings.dtype
