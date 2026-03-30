@@ -39,12 +39,12 @@ calib_data/
 
 ## 模型转换（ONNX -> AXModel）
 已提供必要的量化配置
-- config_image.json，将`calibration_dataset`字段指向`calib_data_image.tar`
+- config_image.json，将`calibration_dataset`字段指向`calib_data_image.tar`，fg-clip v1模型只需要把jpeg，jpg等图片打包成tar包即可。  
 - config_text.json，将`calibration_dataset`字段指向`calib_data_text.tar`
 
 执行编译命令：
 ```bash
-# image_encoder.onnx
+# image_encoder.onnx, 指定--target_hardware AX615
 pulsar2 build --input image_encoder.onnx --config config_image.json --output_dir output_image_encoder --output_name image_encoder.axmodel
 
 # text_encoder.onnx

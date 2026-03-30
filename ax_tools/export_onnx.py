@@ -69,6 +69,17 @@ def new_resize_positional_embeddings(self, positional_embeddings: torch.Tensor,
         return resulted_positional_embeddings
 
 
+class FGClipImageEncoder(nn.Module):
+    def __init__(self, model):
+        super().__init__()
+        self.model = model
+    
+    def forward(self, pixel_values) -> torch.Tensor:
+        image_feature = self.model.get_image_features(pixel_values=pixel_values)
+        image_feature = image_feature / image_feature.norm(p=2, dim=-1, keepdim=True)
+        return image_feature
+    
+    
 class FGClip2ImageEncoder(nn.Module):
     def __init__(self, model):
         super().__init__()
@@ -79,6 +90,17 @@ class FGClip2ImageEncoder(nn.Module):
         image_feature = image_feature / image_feature.norm(p=2, dim=-1, keepdim=True)
         return image_feature
 
+
+class FGClipTextEncoder(nn.Module):
+    def __init__(self, model):
+        super().__init__()
+        self.model = model
+    
+    def forward(self, input_ids, attention_mask=None) -> torch.Tensor:
+        text_feature = self.model.get_text_features(input_ids=input_ids, attention_mask=attention_mask)
+        text_feature = text_feature / text_feature.norm(p=2, dim=-1, keepdim=True)
+        return text_feature
+    
 
 class FGClip2TextEncoder(nn.Module):
     def __init__(self, model):
@@ -93,9 +115,8 @@ class FGClip2TextEncoder(nn.Module):
 
 
 if __name__ == "__main__":
-    model_root = "/data/wangjian/project/hf_cache/qihoo360/fg-clip2-base"
-    model = AutoModelForCausalLM.from_pretrained(model_root, trust_remote_code=True).cuda(1)
-
+    model_root = "/data/wangjian/project/hf_cache/qihoo360/fg-clip-base"
+    model = AutoModelForCausalLM.from_pretrained(model_root, trust_remote_code=True)
     device = model.device
 
     tokenizer = AutoTokenizer.from_pretrained(model_root)
@@ -122,23 +143,44 @@ if __name__ == "__main__":
         if isinstance(m, Fgclip2VisionEmbeddings):
             m.resize_positional_embeddings = types.MethodType(new_resize_positional_embeddings, m)
 
-    image_encoder = FGClip2ImageEncoder(model)
-    # export image onnx
-    torch.onnx.export(image_encoder,
-                (image_input['pixel_values'], image_input['pixel_attention_mask'], image_input['spatial_shapes']),
-                f"image_encoder.onnx",
-                input_names=['pixel_values', 'pixel_attention_mask', 'spatial_shapes'],
-                output_names=['norm_image_features'],
-                export_params=True,
-                opset_version=17,)
-    
-    
-    # export text onnx
-    text_encoder = FGClip2TextEncoder(model)
-    torch.onnx.export(text_encoder,
-                (caption_input['input_ids'], ),
-                f"text_encoder.onnx",
-                input_names=['input_ids', ],
-                output_names=['norm_text_features'],
-                export_params=True,
-                opset_version=17,)
+    # v1
+    if "fg-clip-base" in model_root:
+        # export image onnx
+        image_encoder = FGClipImageEncoder(model)
+        torch.onnx.export(image_encoder,
+            (image_input['pixel_values']),
+            f"image_encoder.onnx",
+            input_names=['pixel_values'],
+            output_names=['norm_image_features'],
+            export_params=True,
+            opset_version=17,)
+        
+        # export text onnx
+        text_encoder = FGClipTextEncoder(model)
+        torch.onnx.export(text_encoder,
+                    (caption_input['input_ids'], ),
+                    f"text_encoder.onnx",
+                    input_names=['input_ids', ],
+                    output_names=['norm_text_features'],
+                    export_params=True,
+                    opset_version=17,)
+    else: # v2
+        # export image onnx
+        image_encoder = FGClip2ImageEncoder(model)
+        torch.onnx.export(image_encoder,
+                    (image_input['pixel_values'], image_input['pixel_attention_mask'], image_input['spatial_shapes']),
+                    f"image_encoder.onnx",
+                    input_names=['pixel_values', 'pixel_attention_mask', 'spatial_shapes'],
+                    output_names=['norm_image_features'],
+                    export_params=True,
+                    opset_version=17,)
+        
+        # export text onnx
+        text_encoder = FGClip2TextEncoder(model)
+        torch.onnx.export(text_encoder,
+                    (caption_input['input_ids'], ),
+                    f"text_encoder.onnx",
+                    input_names=['input_ids', ],
+                    output_names=['norm_text_features'],
+                    export_params=True,
+                    opset_version=17,)
